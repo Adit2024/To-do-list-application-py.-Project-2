@@ -1,0 +1,128 @@
+import tkinter as tk
+from tkinter import messagebox, simpledialog
+import json
+import os
+
+# Task class to manage individual tasks
+class Task:
+    def __init__(self, description, status=False):
+        self.description = description
+        self.status = status  # False for incomplete, True for complete
+
+    def to_dict(self):
+        return {"description": self.description, "status": self.status}
+
+    @classmethod
+    def from_dict(cls, data):
+        return cls(data['description'], data['status'])
+
+# Task Manager class for handling tasks and file operations
+class TaskManager:
+    def __init__(self, file_path="tasks.json"):
+        self.file_path = file_path
+        self.tasks = []
+        self.load_tasks()
+
+    def add_task(self, task):
+        self.tasks.append(task)
+        self.save_tasks()
+
+    def edit_task(self, index, new_description):
+        self.tasks[index].description = new_description
+        self.save_tasks()
+
+    def delete_task(self, index):
+        del self.tasks[index]
+        self.save_tasks()
+
+    def mark_complete(self, index):
+        self.tasks[index].status = True
+        self.save_tasks()
+
+    def load_tasks(self):
+        if os.path.exists(self.file_path):
+            with open(self.file_path, 'r') as f:
+                data = json.load(f)
+                self.tasks = [Task.from_dict(item) for item in data]
+
+    def save_tasks(self):
+        with open(self.file_path, 'w') as f:
+            json.dump([task.to_dict() for task in self.tasks], f)
+
+# Main application class for the Tkinter interface
+class TaskApp:
+    def __init__(self, root, task_manager):
+        self.root = root
+        self.task_manager = task_manager
+
+        self.root.title("Task Manager")
+        self.root.geometry("400x400")
+
+        # Task listbox to display tasks
+        self.task_listbox = tk.Listbox(root, height=15, width=50)
+        self.task_listbox.pack(pady=20)
+
+        # Button frame
+        button_frame = tk.Frame(root)
+        button_frame.pack(pady=10)
+
+        tk.Button(button_frame, text="Add Task", command=self.add_task).pack(side="left", padx=5)
+        tk.Button(button_frame, text="Edit Task", command=self.edit_task).pack(side="left", padx=5)
+        tk.Button(button_frame, text="Delete Task", command=self.delete_task).pack(side="left", padx=5)
+        tk.Button(button_frame, text="Mark Complete", command=self.mark_complete).pack(side="left", padx=5)
+
+        self.load_tasks()
+
+    # Load tasks into the listbox
+    def load_tasks(self):
+        self.task_listbox.delete(0, tk.END)
+        for i, task in enumerate(self.task_manager.tasks):
+            status = "✓" if task.status else "✗"
+            self.task_listbox.insert(tk.END, f"{i+1}. {task.description} [{status}]")
+
+    # Add task
+    def add_task(self):
+        task_description = simpledialog.askstring("Add Task", "Enter task description:")
+        if task_description:
+            new_task = Task(task_description)
+            self.task_manager.add_task(new_task)
+            self.load_tasks()
+
+    # Edit task
+    def edit_task(self):
+        selected_task = self.get_selected_task_index()
+        if selected_task is not None:
+            new_description = simpledialog.askstring("Edit Task", "Edit task description:", initialvalue=self.task_manager.tasks[selected_task].description)
+            if new_description:
+                self.task_manager.edit_task(selected_task, new_description)
+                self.load_tasks()
+
+    # Delete task
+    def delete_task(self):
+        selected_task = self.get_selected_task_index()
+        if selected_task is not None:
+            self.task_manager.delete_task(selected_task)
+            self.load_tasks()
+
+    # Mark task as complete
+    def mark_complete(self):
+        selected_task = self.get_selected_task_index()
+        if selected_task is not None:
+            self.task_manager.mark_complete(selected_task)
+            self.load_tasks()
+
+    # Get the index of the selected task from the listbox
+    def get_selected_task_index(self):
+        try:
+            return self.task_listbox.curselection()[0]
+        except IndexError:
+            messagebox.showwarning("Select Task", "Please select a task.")
+            return None
+
+# Main function to run the application
+if __name__ == "__main__":
+    task_manager = TaskManager()
+
+    root = tk.Tk()
+    app = TaskApp(root, task_manager)
+    root.mainloop()
